@@ -31,3 +31,19 @@ Project ini dibuat sebagai fondasi aplikasi photo booth wedding yang scalable da
    ```bash
    npm install
    ```
+
+## Environment Setup
+
+1. Copy `.env.example` menjadi `.env.local`
+2. Isi value environment sesuai kebutuhan lokal
+3. Jangan commit `.env.local` ke repository
+
+Contoh variable yang digunakan:
+
+- `DATABASE_URL`
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STORAGE_BUCKET`
