@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { randomUUID } from "crypto";
 
 type Props = {
   params: Promise<{
@@ -20,15 +21,24 @@ export default async function GuestPage({ params }: Props) {
     notFound();
   }
 
+  const guestSession = await prisma.guestSession.create({
+    data: {
+      eventId: event.id,
+      sessionKey: randomUUID(),
+    },
+  });
+
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-2xl rounded-2xl border p-6 shadow">
         <h1 className="text-2xl font-bold">Welcome Guest</h1>
-        <p className="mt-2 text-sm text-gray-500">Kamu masuk ke event:</p>
+        <p className="mt-2 text-sm text-gray-500">
+          Guest session berhasil dibuat.
+        </p>
 
         <div className="mt-4 space-y-2">
           <p>
-            <span className="font-semibold">Title:</span> {event.title}
+            <span className="font-semibold">Event:</span> {event.title}
           </p>
           <p>
             <span className="font-semibold">Date:</span>{" "}
@@ -37,6 +47,10 @@ export default async function GuestPage({ params }: Props) {
           <p>
             <span className="font-semibold">Location:</span>{" "}
             {event.location || "-"}
+          </p>
+          <p>
+            <span className="font-semibold">Guest Session ID:</span>{" "}
+            {guestSession.id}
           </p>
         </div>
       </div>
