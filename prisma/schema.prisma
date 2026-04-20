@@ -7,12 +7,56 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  admin
+  vendor
+  crew
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
   password  String
-  role      String   @default("admin")
+  role      Role     @default(admin)
+  events    Event[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Event {
+  id            String        @id @default(cuid())
+  title         String
+  slug          String        @unique
+  description   String?
+  eventDate     DateTime
+  location      String?
+  qrToken       String?       @unique
+  createdById   String
+  createdBy     User          @relation(fields: [createdById], references: [id])
+  guestSessions GuestSession[]
+  photos        Photo[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model GuestSession {
+  id         String   @id @default(cuid())
+  eventId    String
+  event      Event    @relation(fields: [eventId], references: [id])
+  sessionKey String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Photo {
+  id          String   @id @default(cuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id])
+  fileName    String
+  filePath    String   @unique
+  fileUrl     String
+  mimeType    String
+  size        Int
+  uploadedAt  DateTime @default(now())
 }
