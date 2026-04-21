@@ -74,6 +74,15 @@ export default async function DashboardPage() {
                       {event.location || "-"}
                     </p>
                   </div>
+
+                  <div className="mt-4">
+                    <Link
+                      href={`/dashboard/events/${event.id}`}
+                      className="rounded-lg border px-4 py-2 text-sm"
+                    >
+                      Open Event
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>
