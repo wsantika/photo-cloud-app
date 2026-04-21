@@ -78,24 +78,6 @@ export async function GET(req: Request, { params }: RouteProps) {
       });
     }
 
-    if (!currentSession) {
-      currentSession = await prisma.photoSession.findFirst({
-        where: {
-          eventId: event.id,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          photos: {
-            orderBy: {
-              uploadedAt: "asc",
-            },
-          },
-        },
-      });
-    }
-
     return NextResponse.json({
       eventId: event.id,
       eventTitle: event.title,

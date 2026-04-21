@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PhotoSessionQr } from "@/components/photo-session-qr";
 import { PhotographerCameraCapture } from "@/components/photographer-camera-capture";
 
@@ -50,11 +51,19 @@ export function PhotographerSessionLivePanel({
   initialSession,
   selectedSessionId,
 }: PhotographerSessionLivePanelProps) {
+  const router = useRouter();
+
   const [currentSession, setCurrentSession] = useState<LiveSession | null>(
     initialSession,
   );
   const [isPolling, setIsPolling] = useState(false);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [cancellingSession, setCancellingSession] = useState(false);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [reopeningSession, setReopeningSession] = useState(false);
+  const [creatingNextTargetShots, setCreatingNextTargetShots] = useState<
+    number | null
+  >(null);
   const [actionMessage, setActionMessage] = useState("");
 
   const fetchLatestPanel = useCallback(async () => {
@@ -140,6 +149,208 @@ export function PhotographerSessionLivePanel({
     }
   }
 
+  async function handleCreateNextSession(targetShots: number) {
+    try {
+      setCreatingNextTargetShots(targetShots);
+      setActionMessage("");
+
+      const response = await fetch(`/api/events/${eventId}/photo-sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          targetShots,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setActionMessage(result.message || "Gagal membuat photo session baru");
+        return;
+      }
+
+      const targetSessionId = result.photoSession?.id;
+
+      if (!targetSessionId) {
+        setActionMessage("Session target tidak ditemukan.");
+        return;
+      }
+
+      if (result.mode === "existing") {
+        setActionMessage(
+          "Masih ada session yang terbuka. Dialihkan ke session tersebut.",
+        );
+      }
+
+      if (result.mode === "created") {
+        setActionMessage("Session baru berhasil dibuat.");
+      }
+
+      router.push(
+        `/dashboard/events/${eventId}/photobooth?sessionId=${targetSessionId}`,
+      );
+      router.refresh();
+    } catch (error) {
+      console.error("CREATE_NEXT_SESSION_CLIENT_ERROR", error);
+      setActionMessage("Terjadi kesalahan saat membuat photo session baru");
+    } finally {
+      setCreatingNextTargetShots(null);
+    }
+  }
+
+  async function handleReopenSession() {
+    if (!currentSession) {
+      return;
+    }
+
+    try {
+      setReopeningSession(true);
+      setActionMessage("");
+
+      const response = await fetch(
+        `/api/photo-sessions/${currentSession.id}/reopen`,
+        {
+          method: "POST",
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setActionMessage(result.message || "Gagal reopen session");
+        return;
+      }
+
+      const targetSessionId = result.photoSession?.id;
+
+      if (!targetSessionId) {
+        setActionMessage("Session target tidak ditemukan.");
+        return;
+      }
+
+      if (result.mode === "existing") {
+        setActionMessage(
+          "Masih ada session yang terbuka. Dialihkan ke session tersebut.",
+        );
+      }
+
+      if (result.mode === "reopened") {
+        setActionMessage("Session berhasil di-reopen.");
+      }
+
+      router.push(
+        `/dashboard/events/${eventId}/photobooth?sessionId=${targetSessionId}`,
+      );
+      router.refresh();
+    } catch (error) {
+      console.error("REOPEN_SESSION_CLIENT_ERROR", error);
+      setActionMessage("Terjadi kesalahan saat reopen session");
+    } finally {
+      setReopeningSession(false);
+    }
+  }
+
+  async function handleCancelSession() {
+    if (!currentSession) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Yakin mau cancel session ini? Session akan ditandai sebagai cancelled.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCancellingSession(true);
+      setActionMessage("");
+
+      const response = await fetch(
+        `/api/photo-sessions/${currentSession.id}/cancel`,
+        {
+          method: "POST",
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setActionMessage(result.message || "Gagal cancel session");
+        return;
+      }
+
+      setActionMessage("Session berhasil di-cancel");
+
+      const redirectSessionId = result.redirectSessionId;
+
+      if (redirectSessionId) {
+        router.push(
+          `/dashboard/events/${eventId}/photobooth?sessionId=${redirectSessionId}`,
+        );
+      } else {
+        router.push(`/dashboard/events/${eventId}/photobooth`);
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error("CANCEL_SESSION_CLIENT_ERROR", error);
+      setActionMessage("Terjadi kesalahan saat cancel session");
+    } finally {
+      setCancellingSession(false);
+    }
+  }
+
+  async function handleDeleteEmptySession() {
+    if (!currentSession) {
+      return;
+    }
+
+    const confirmed = window.confirm("Yakin mau menghapus session kosong ini?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingSession(true);
+      setActionMessage("");
+
+      const response = await fetch(`/api/photo-sessions/${currentSession.id}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setActionMessage(result.message || "Gagal menghapus session kosong");
+        return;
+      }
+
+      setActionMessage("Session kosong berhasil dihapus");
+
+      const redirectSessionId = result.redirectSessionId;
+
+      if (redirectSessionId) {
+        router.push(
+          `/dashboard/events/${eventId}/photobooth?sessionId=${redirectSessionId}`,
+        );
+      } else {
+        router.push(`/dashboard/events/${eventId}/photobooth`);
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error("DELETE_EMPTY_SESSION_CLIENT_ERROR", error);
+      setActionMessage("Terjadi kesalahan saat menghapus session kosong");
+    } finally {
+      setDeletingSession(false);
+    }
+  }
+
   if (!currentSession) {
     return (
       <div className="rounded-3xl border p-6">
@@ -158,6 +369,17 @@ export function PhotographerSessionLivePanel({
   const guestUrl = `${appUrl}/guest/session/${currentSession.qrToken}`;
   const canCapture =
     currentSession.status === "pending" || currentSession.status === "active";
+  const canDeleteEmptySession =
+    currentSession.status === "pending" &&
+    currentSession.currentShotCount === 0 &&
+    currentSession.photos.length === 0;
+
+  const canCancelSession =
+    (currentSession.status === "pending" ||
+      currentSession.status === "active") &&
+    !canDeleteEmptySession;
+
+  const canReopenSession = currentSession.status === "cancelled";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
@@ -208,14 +430,73 @@ export function PhotographerSessionLivePanel({
           <p className="break-all text-xs text-gray-400">
             <span className="font-medium">Guest URL:</span> {guestUrl}
           </p>
+          <div className="flex flex-col gap-2 pt-2">
+            {canDeleteEmptySession ? (
+              <button
+                type="button"
+                onClick={handleDeleteEmptySession}
+                disabled={deletingSession}
+                className="w-full rounded-lg border border-red-500 px-4 py-2 text-sm font-medium text-red-300 disabled:opacity-50"
+              >
+                {deletingSession
+                  ? "Deleting Session..."
+                  : "Delete Empty Session"}
+              </button>
+            ) : null}
+
+            {canCancelSession ? (
+              <button
+                type="button"
+                onClick={handleCancelSession}
+                disabled={cancellingSession}
+                className="w-full rounded-lg border border-yellow-500 px-4 py-2 text-sm font-medium text-yellow-300 disabled:opacity-50"
+              >
+                {cancellingSession ? "Cancelling Session..." : "Cancel Session"}
+              </button>
+            ) : null}
+
+            {canReopenSession ? (
+              <button
+                type="button"
+                onClick={handleReopenSession}
+                disabled={reopeningSession}
+                className="w-full rounded-lg border border-blue-500 px-4 py-2 text-sm font-medium text-blue-300 disabled:opacity-50"
+              >
+                {reopeningSession ? "Reopening Session..." : "Reopen Session"}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {currentSession.status === "completed" ? (
-          <div className="rounded-2xl border border-green-700/40 bg-green-900/20 p-4">
+          <div className="space-y-3 rounded-2xl border border-green-700/40 bg-green-900/20 p-4">
             <p className="text-sm text-green-200">
-              Sesi ini sudah penuh. Jika perlu retake, kamu bisa hapus salah
-              satu foto.
+              Sesi ini sudah penuh. Buat sesi baru untuk tamu berikutnya.
             </p>
+
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleCreateNextSession(3)}
+                disabled={creatingNextTargetShots !== null}
+                className="w-full rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+              >
+                {creatingNextTargetShots === 3
+                  ? "Creating 3 Shots..."
+                  : "Create Next Session 3 Shots"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCreateNextSession(5)}
+                disabled={creatingNextTargetShots !== null}
+                className="w-full rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                {creatingNextTargetShots === 5
+                  ? "Creating 5 Shots..."
+                  : "Create Next Session 5 Shots"}
+              </button>
+            </div>
           </div>
         ) : null}
       </div>

@@ -59,14 +59,13 @@ export default async function PhotographerPanelPage({
       ) ?? null)
     : null;
 
-  const currentSession =
-    selectedSession ??
+  const openSession =
     event.photoSessions.find(
       (photoSession) =>
         photoSession.status === "pending" || photoSession.status === "active",
-    ) ??
-    event.photoSessions[0] ??
-    null;
+    ) ?? null;
+
+  const currentSession = selectedSession ?? openSession ?? null;
 
   const appUrl = process.env.APP_URL || "http://localhost:3000";
 
@@ -117,9 +116,8 @@ export default async function PhotographerPanelPage({
                 Ketuk tombol ini untuk memulai sesi foto
               </h2>
               <p className="mt-3 text-sm text-gray-400">
-                Buat session baru untuk grup tamu berikutnya. Setelah session
-                dibuat, QR code akan muncul di sini dan preview foto akan
-                ditampilkan untuk monitoring.
+                Saat ini belum ada photo session yang pending atau active. Buat
+                session baru untuk grup tamu berikutnya.
               </p>
 
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
