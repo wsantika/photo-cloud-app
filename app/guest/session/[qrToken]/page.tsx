@@ -35,16 +35,30 @@ export default async function GuestPhotoSessionPage({
     <main className="min-h-screen bg-black px-4 py-8 text-white">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="rounded-2xl border p-6 shadow">
-          <h1 className="text-2xl font-bold">Photo Booth Gallery</h1>
-          <p className="mt-2 text-sm text-gray-300">
-            Terima kasih sudah menggunakan photo booth.
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Photo Booth Gallery</h1>
+              <p className="mt-2 text-sm text-gray-300">
+                Terima kasih sudah menggunakan photo booth.
+              </p>
+            </div>
+
+            {photoSession.photos.length > 0 ? (
+              <a
+                href={`/api/guest/session/${qrToken}/download`}
+                className="inline-block rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
+              >
+                Download All Photos
+              </a>
+            ) : null}
+          </div>
 
           <div className="mt-4 space-y-2 text-sm">
             <p>
               <span className="font-medium">Event:</span>{" "}
               {photoSession.event.title}
             </p>
+
             <div className="flex items-center gap-2 text-sm">
               <span className="font-medium">Session Status:</span>
               <span
@@ -61,6 +75,7 @@ export default async function GuestPhotoSessionPage({
                 {photoSession.status}
               </span>
             </div>
+
             <p>
               <span className="font-medium">Progress:</span>{" "}
               {photoSession.currentShotCount} / {photoSession.targetShots}
@@ -104,17 +119,26 @@ export default async function GuestPhotoSessionPage({
                     />
                   </div>
 
-                  <div className="space-y-2 p-4">
+                  <div className="space-y-3 p-4">
                     <p className="truncate text-sm">{photo.fileName}</p>
 
-                    <a
-                      href={photo.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-black"
-                    >
-                      Open Photo
-                    </a>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={photo.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block rounded-lg border px-4 py-2 text-sm"
+                      >
+                        Preview
+                      </a>
+
+                      <a
+                        href={`/api/guest/photo/${photo.id}/download`}
+                        className="inline-block rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
+                      >
+                        Download
+                      </a>
+                    </div>
                   </div>
                 </div>
               ))}

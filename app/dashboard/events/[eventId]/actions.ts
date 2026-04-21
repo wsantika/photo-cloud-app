@@ -49,4 +49,5 @@ export async function createPhotoSession(formData: FormData) {
   });
 
   revalidatePath(`/dashboard/events/${event.id}`);
+  revalidatePath(`/dashboard/events/${event.id}/photobooth`);
 }

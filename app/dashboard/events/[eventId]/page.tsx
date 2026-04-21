@@ -77,6 +77,12 @@ export default async function EventDetailPage({
               {event.location || "-"}
             </p>
           </div>
+          <Link
+            href={`/dashboard/events/${event.id}/photobooth`}
+            className="inline-block rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
+          >
+            Open Photographer Panel
+          </Link>
         </div>
 
         <div className="rounded-2xl border p-6 shadow">
@@ -160,14 +166,23 @@ export default async function EventDetailPage({
                             {photoSession.status}
                           </span>
                         </div>
-                        <p>
-                          <span className="font-medium">Created At:</span>{" "}
-                          {new Date(photoSession.createdAt).toLocaleString()}
-                        </p>
-                        <p className="break-all text-xs text-gray-500">
-                          <span className="font-medium">Guest URL:</span>{" "}
-                          {guestUrl}
-                        </p>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <Link
+                            href={`/dashboard/events/${event.id}/photobooth?sessionId=${photoSession.id}`}
+                            className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
+                          >
+                            Open in Photographer Panel
+                          </Link>
+
+                          <a
+                            href={guestUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border px-4 py-2 text-sm"
+                          >
+                            Open Guest Page
+                          </a>
+                        </div>
                       </div>
                     </div>
                   </div>
