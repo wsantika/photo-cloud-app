@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 
 export default function UploadTestPage() {
   const [eventId, setEventId] = useState("");
+  const [photoSessionId, setPhotoSessionId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,8 +13,8 @@ export default function UploadTestPage() {
     e.preventDefault();
     setMessage("");
 
-    if (!file || !eventId) {
-      setMessage("eventId dan file wajib diisi");
+    if (!file || !eventId || !photoSessionId) {
+      setMessage("eventId, photoSessionId, dan file wajib diisi");
       return;
     }
 
@@ -22,6 +23,7 @@ export default function UploadTestPage() {
     try {
       const formData = new FormData();
       formData.append("eventId", eventId);
+      formData.append("photoSessionId", photoSessionId);
       formData.append("file", file);
 
       const response = await fetch("/api/upload", {
@@ -33,17 +35,19 @@ export default function UploadTestPage() {
 
       if (!response.ok) {
         setMessage(result.message || "Upload gagal");
-        setLoading(false);
         return;
       }
 
       setMessage("Upload berhasil");
       console.log("Upload result:", result);
-    } catch (error) {
-      setMessage("Terjadi kesalahan saat upload");
-    }
 
-    setLoading(false);
+      setFile(null);
+    } catch (error) {
+      console.error("Upload error:", error);
+      setMessage("Terjadi kesalahan saat upload");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -60,6 +64,21 @@ export default function UploadTestPage() {
               onChange={(e) => setEventId(e.target.value)}
               className="w-full rounded-lg border px-3 py-2"
               placeholder="Masukkan eventId"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Photo Session ID
+            </label>
+            <input
+              type="text"
+              value={photoSessionId}
+              onChange={(e) => setPhotoSessionId(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2"
+              placeholder="Masukkan photoSessionId"
+              required
             />
           </div>
 
@@ -70,6 +89,7 @@ export default function UploadTestPage() {
               accept="image/png,image/jpeg,image/webp"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
               className="w-full rounded-lg border px-3 py-2"
+              required
             />
           </div>
 

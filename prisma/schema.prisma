@@ -13,31 +13,40 @@ enum Role {
   crew
 }
 
+enum PhotoSessionStatus {
+  pending
+  active
+  completed
+  cancelled
+}
+
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(admin)
-  events    Event[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  password      String
+  role          Role           @default(admin)
+  events        Event[]
+  photoSessions PhotoSession[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Event {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   title         String
-  slug          String        @unique
+  slug          String         @unique
   description   String?
   eventDate     DateTime
   location      String?
-  qrToken       String?       @unique
+  qrToken       String?        @unique
   createdById   String
-  createdBy     User          @relation(fields: [createdById], references: [id])
+  createdBy     User           @relation(fields: [createdById], references: [id])
   guestSessions GuestSession[]
   photos        Photo[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  photoSessions PhotoSession[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model GuestSession {
@@ -50,13 +59,32 @@ model GuestSession {
 }
 
 model Photo {
-  id          String   @id @default(cuid())
-  eventId     String
-  event       Event    @relation(fields: [eventId], references: [id])
-  fileName    String
-  filePath    String   @unique
-  fileUrl     String
-  mimeType    String
-  size        Int
-  uploadedAt  DateTime @default(now())
+  id             String        @id @default(cuid())
+  eventId        String
+  photoSessionId String?
+  event          Event         @relation(fields: [eventId], references: [id])
+  photoSession   PhotoSession? @relation(fields: [photoSessionId], references: [id])
+  fileName       String
+  filePath       String        @unique
+  fileUrl        String
+  mimeType       String
+  size           Int
+  uploadedAt     DateTime      @default(now())
+}
+
+model PhotoSession {
+  id               String             @id @default(cuid())
+  eventId          String
+  createdById      String
+  qrToken          String             @unique
+  targetShots      Int
+  currentShotCount Int                @default(0)
+  status           PhotoSessionStatus @default(pending)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  event            Event              @relation(fields: [eventId], references: [id])
+  createdBy        User               @relation(fields: [createdById], references: [id])
+  photos           Photo[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }

@@ -11,10 +11,11 @@ export async function POST(req: Request) {
 
     const file = formData.get("file") as File | null;
     const eventId = formData.get("eventId") as string | null;
+    const photoSessionId = formData.get("photoSessionId") as string | null;
 
-    if (!file || !eventId) {
+    if (!file || !eventId || !photoSessionId) {
       return NextResponse.json(
-        { message: "File dan eventId wajib diisi" },
+        { message: "File, eventId, dan photoSessionId wajib diisi" },
         { status: 400 },
       );
     }
@@ -33,6 +34,15 @@ export async function POST(req: Request) {
       );
     }
 
+    const bucketName = process.env.SUPABASE_STORAGE_BUCKET;
+
+    if (!bucketName) {
+      return NextResponse.json(
+        { message: "SUPABASE_STORAGE_BUCKET belum dikonfigurasi" },
+        { status: 500 },
+      );
+    }
+
     const event = await prisma.event.findUnique({
       where: { id: eventId },
     });
@@ -44,15 +54,52 @@ export async function POST(req: Request) {
       );
     }
 
+    const photoSession = await prisma.photoSession.findFirst({
+      where: {
+        id: photoSessionId,
+        eventId: eventId,
+      },
+    });
+
+    if (!photoSession) {
+      return NextResponse.json(
+        {
+          message:
+            "Photo session tidak ditemukan atau tidak cocok dengan event",
+        },
+        { status: 404 },
+      );
+    }
+
+    if (photoSession.status === "completed") {
+      return NextResponse.json(
+        {
+          message:
+            "Photo session ini sudah selesai dan tidak bisa menerima upload lagi",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (photoSession.status === "cancelled") {
+      return NextResponse.json(
+        {
+          message:
+            "Photo session ini dibatalkan dan tidak bisa menerima upload",
+        },
+        { status: 400 },
+      );
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
-    const filePath = `${eventId}/${fileName}`;
+    const uniqueFileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `events/${eventId}/sessions/${photoSessionId}/${uniqueFileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from(process.env.SUPABASE_STORAGE_BUCKET!)
+      .from(bucketName)
       .upload(filePath, buffer, {
         contentType: file.type,
         upsert: false,
@@ -60,36 +107,75 @@ export async function POST(req: Request) {
 
     if (uploadError) {
       console.error("Supabase upload error:", uploadError);
+
       return NextResponse.json(
-        { message: "Gagal upload file ke storage" },
+        { message: uploadError.message || "Gagal upload file ke storage" },
         { status: 500 },
       );
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from(process.env.SUPABASE_STORAGE_BUCKET!)
+      .from(bucketName)
       .getPublicUrl(filePath);
 
-    const photo = await prisma.photo.create({
-      data: {
-        eventId,
-        fileName: file.name,
-        filePath,
-        fileUrl: publicUrlData.publicUrl,
-        mimeType: file.type,
-        size: file.size,
-      },
+    const now = new Date();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const savedPhoto = await tx.photo.create({
+        data: {
+          eventId,
+          photoSessionId,
+          fileName: file.name,
+          filePath,
+          fileUrl: publicUrlData.publicUrl,
+          mimeType: file.type,
+          size: file.size,
+        },
+      });
+
+      const totalPhotos = await tx.photo.count({
+        where: {
+          photoSessionId,
+        },
+      });
+
+      const nextStatus =
+        totalPhotos >= photoSession.targetShots ? "completed" : "active";
+
+      const updatedPhotoSession = await tx.photoSession.update({
+        where: {
+          id: photoSessionId,
+        },
+        data: {
+          currentShotCount: totalPhotos,
+          status: nextStatus,
+          startedAt: photoSession.startedAt ?? now,
+          completedAt:
+            nextStatus === "completed"
+              ? (photoSession.completedAt ?? now)
+              : null,
+        },
+      });
+
+      return {
+        savedPhoto,
+        updatedPhotoSession,
+        totalPhotos,
+      };
     });
 
     return NextResponse.json(
       {
         message: "Upload berhasil",
-        data: photo,
+        data: result.savedPhoto,
+        photoSession: result.updatedPhotoSession,
+        currentShotCount: result.totalPhotos,
       },
       { status: 201 },
     );
   } catch (error) {
     console.error("Upload photo error:", error);
+
     return NextResponse.json(
       { message: "Terjadi kesalahan saat upload foto" },
       { status: 500 },
