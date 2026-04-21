@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { PhotoSessionQr } from "@/components/photo-session-qr";
+import { PhotographerCameraCapture } from "@/components/photographer-camera-capture";
 
 type LivePhoto = {
   id: string;
@@ -155,6 +156,8 @@ export function PhotographerSessionLivePanel({
   }
 
   const guestUrl = `${appUrl}/guest/session/${currentSession.qrToken}`;
+  const canCapture =
+    currentSession.status === "pending" || currentSession.status === "active";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
@@ -217,77 +220,88 @@ export function PhotographerSessionLivePanel({
         ) : null}
       </div>
 
-      <div className="rounded-3xl border p-6">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold">Live Preview</h2>
-            <p className="mt-1 text-sm text-gray-400">
-              Preview hasil foto untuk session yang sedang dipakai.
-            </p>
-          </div>
-        </div>
+      <div className="space-y-6">
+        <PhotographerCameraCapture
+          eventId={eventId}
+          photoSessionId={currentSession.id}
+          disabled={!canCapture}
+          onUploadSuccess={fetchLatestPanel}
+        />
 
-        {actionMessage ? (
-          <div className="mb-4 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm">
-            {actionMessage}
-          </div>
-        ) : null}
-
-        {currentSession.photos.length === 0 ? (
-          <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed">
-            <div className="text-center">
-              <p className="text-base font-medium">
-                Belum ada foto dalam sesi ini
-              </p>
-              <p className="mt-2 text-sm text-gray-400">
-                Setelah upload pertama berhasil, preview akan muncul di sini.
+        <div className="rounded-3xl border p-6">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold">Live Preview</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                Preview hasil foto untuk session yang sedang dipakai.
               </p>
             </div>
           </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {currentSession.photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="overflow-hidden rounded-2xl border"
-              >
-                <div className="relative aspect-square bg-neutral-900">
-                  <Image
-                    src={photo.fileUrl}
-                    alt={photo.fileName}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
 
-                <div className="space-y-2 p-4">
-                  <p className="truncate text-sm">{photo.fileName}</p>
+          {actionMessage ? (
+            <div className="mb-4 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm">
+              {actionMessage}
+            </div>
+          ) : null}
 
-                  <div className="flex flex-wrap gap-2">
-                    <a
-                      href={photo.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg border px-3 py-2 text-sm"
-                    >
-                      Preview
-                    </a>
+          {currentSession.photos.length === 0 ? (
+            <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed">
+              <div className="text-center">
+                <p className="text-base font-medium">
+                  Belum ada foto dalam sesi ini
+                </p>
+                <p className="mt-2 text-sm text-gray-400">
+                  Setelah upload pertama berhasil, preview akan muncul di sini.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {currentSession.photos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="overflow-hidden rounded-2xl border"
+                >
+                  <div className="relative aspect-square bg-neutral-900">
+                    <Image
+                      src={photo.fileUrl}
+                      alt={photo.fileName}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePhoto(photo.id)}
-                      disabled={deletingPhotoId === photo.id}
-                      className="rounded-lg border border-red-500 px-3 py-2 text-sm text-red-300 disabled:opacity-50"
-                    >
-                      {deletingPhotoId === photo.id ? "Deleting..." : "Delete"}
-                    </button>
+                  <div className="space-y-2 p-4">
+                    <p className="truncate text-sm">{photo.fileName}</p>
+
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={photo.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-lg border px-3 py-2 text-sm"
+                      >
+                        Preview
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePhoto(photo.id)}
+                        disabled={deletingPhotoId === photo.id}
+                        className="rounded-lg border border-red-500 px-3 py-2 text-sm text-red-300 disabled:opacity-50"
+                      >
+                        {deletingPhotoId === photo.id
+                          ? "Deleting..."
+                          : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
