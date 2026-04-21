@@ -130,13 +130,36 @@ export default async function EventDetailPage({
                           {photoSession.qrToken}
                         </p>
                         <p>
+                          <span className="font-medium">Progress:</span>{" "}
+                          {photoSession.currentShotCount} /{" "}
+                          {photoSession.targetShots}
+                        </p>
+                        <p>
                           <span className="font-medium">Target Shots:</span>{" "}
                           {photoSession.targetShots}
                         </p>
                         <p>
-                          <span className="font-medium">Status:</span>{" "}
-                          {photoSession.status}
+                          <span className="font-medium">
+                            Current Shot Count:
+                          </span>{" "}
+                          {photoSession.currentShotCount}
                         </p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">Status:</span>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              photoSession.status === "completed"
+                                ? "bg-green-100 text-green-700"
+                                : photoSession.status === "active"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : photoSession.status === "cancelled"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {photoSession.status}
+                          </span>
+                        </div>
                         <p>
                           <span className="font-medium">Created At:</span>{" "}
                           {new Date(photoSession.createdAt).toLocaleString()}

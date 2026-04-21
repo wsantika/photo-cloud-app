@@ -45,13 +45,33 @@ export default async function GuestPhotoSessionPage({
               <span className="font-medium">Event:</span>{" "}
               {photoSession.event.title}
             </p>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium">Session Status:</span>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  photoSession.status === "completed"
+                    ? "bg-green-100 text-green-700"
+                    : photoSession.status === "active"
+                      ? "bg-blue-100 text-blue-700"
+                      : photoSession.status === "cancelled"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {photoSession.status}
+              </span>
+            </div>
             <p>
-              <span className="font-medium">Session Status:</span>{" "}
-              {photoSession.status}
+              <span className="font-medium">Progress:</span>{" "}
+              {photoSession.currentShotCount} / {photoSession.targetShots}
             </p>
             <p>
               <span className="font-medium">Target Shots:</span>{" "}
               {photoSession.targetShots}
+            </p>
+            <p>
+              <span className="font-medium">Current Shot Count:</span>{" "}
+              {photoSession.currentShotCount}
             </p>
             <p>
               <span className="font-medium">Total Photos:</span>{" "}
