@@ -73,17 +73,18 @@ model Photo {
 }
 
 model PhotoSession {
-  id          String             @id @default(cuid())
-  eventId     String
-  createdById String
-  qrToken     String             @unique
-  targetShots Int
-  status      PhotoSessionStatus @default(pending)
-  startedAt   DateTime?
-  completedAt DateTime?
-  event       Event              @relation(fields: [eventId], references: [id])
-  createdBy   User               @relation(fields: [createdById], references: [id])
-  photos      Photo[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id               String             @id @default(cuid())
+  eventId          String
+  createdById      String
+  qrToken          String             @unique
+  targetShots      Int
+  currentShotCount Int                @default(0)
+  status           PhotoSessionStatus @default(pending)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  event            Event              @relation(fields: [eventId], references: [id])
+  createdBy        User               @relation(fields: [createdById], references: [id])
+  photos           Photo[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
