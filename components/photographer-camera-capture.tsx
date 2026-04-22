@@ -9,6 +9,13 @@ type PhotographerCameraCaptureProps = {
   onUploadSuccess?: () => void | Promise<void>;
 };
 
+type CameraDevice = {
+  deviceId: string;
+  label: string;
+};
+
+const SHOULD_UNMIRROR_CAMERA = true;
+
 export function PhotographerCameraCapture({
   eventId,
   photoSessionId,
@@ -19,32 +26,101 @@ export function PhotographerCameraCapture({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [devices, setDevices] = useState<CameraDevice[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [loadingDevices, setLoadingDevices] = useState(false);
   const [startingCamera, setStartingCamera] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [message, setMessage] = useState("");
+
+  async function loadCameraDevices() {
+    try {
+      setLoadingDevices(true);
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        setMessage("Browser ini tidak mendukung akses daftar kamera.");
+        return;
+      }
+
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+
+      const videoInputs = mediaDevices
+        .filter((device) => device.kind === "videoinput")
+        .map((device, index) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Camera ${index + 1}`,
+        }));
+
+      setDevices(videoInputs);
+
+      if (!selectedDeviceId && videoInputs.length > 0) {
+        setSelectedDeviceId(videoInputs[0].deviceId);
+      }
+
+      if (
+        selectedDeviceId &&
+        videoInputs.length > 0 &&
+        !videoInputs.some((device) => device.deviceId === selectedDeviceId)
+      ) {
+        setSelectedDeviceId(videoInputs[0].deviceId);
+      }
+    } catch (error) {
+      console.error("LOAD_CAMERA_DEVICES_ERROR", error);
+      setMessage("Gagal mengambil daftar kamera.");
+    } finally {
+      setLoadingDevices(false);
+    }
+  }
+
+  async function attachStreamToVideo(stream: MediaStream) {
+    if (!videoRef.current) {
+      return;
+    }
+
+    videoRef.current.srcObject = stream;
+    await videoRef.current.play();
+  }
 
   async function startCamera() {
     try {
       setStartingCamera(true);
       setMessage("");
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false,
-      });
-
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setMessage("Browser ini tidak mendukung akses kamera.");
+        return;
       }
 
+      if (streamRef.current) {
+        for (const track of streamRef.current.getTracks()) {
+          track.stop();
+        }
+        streamRef.current = null;
+      }
+
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: selectedDeviceId
+          ? {
+              deviceId: {
+                exact: selectedDeviceId,
+              },
+            }
+          : true,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      streamRef.current = stream;
+      await attachStreamToVideo(stream);
       setCameraStarted(true);
+
+      await loadCameraDevices();
     } catch (error) {
       console.error("START_CAMERA_ERROR", error);
       setMessage("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
+      setCameraStarted(false);
     } finally {
       setStartingCamera(false);
     }
@@ -64,6 +140,50 @@ export function PhotographerCameraCapture({
     }
 
     setCameraStarted(false);
+  }
+
+  async function restartCameraWithSelectedDevice(nextDeviceId: string) {
+    try {
+      setMessage("");
+      setStartingCamera(true);
+
+      if (streamRef.current) {
+        for (const track of streamRef.current.getTracks()) {
+          track.stop();
+        }
+        streamRef.current = null;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: nextDeviceId
+          ? {
+              deviceId: {
+                exact: nextDeviceId,
+              },
+            }
+          : true,
+      });
+
+      streamRef.current = stream;
+      await attachStreamToVideo(stream);
+      setCameraStarted(true);
+    } catch (error) {
+      console.error("RESTART_CAMERA_ERROR", error);
+      setMessage("Gagal mengganti kamera.");
+      setCameraStarted(false);
+    } finally {
+      setStartingCamera(false);
+    }
+  }
+
+  async function handleDeviceChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const nextDeviceId = e.target.value;
+    setSelectedDeviceId(nextDeviceId);
+
+    if (cameraStarted) {
+      await restartCameraWithSelectedDevice(nextDeviceId);
+    }
   }
 
   async function capturePhoto() {
@@ -96,7 +216,17 @@ export function PhotographerCameraCapture({
         return;
       }
 
-      context.drawImage(video, 0, 0, width, height);
+      context.clearRect(0, 0, width, height);
+
+      if (SHOULD_UNMIRROR_CAMERA) {
+        context.save();
+        context.translate(width, 0);
+        context.scale(-1, 1);
+        context.drawImage(video, 0, 0, width, height);
+        context.restore();
+      } else {
+        context.drawImage(video, 0, 0, width, height);
+      }
 
       const blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob(resolve, "image/jpeg", 0.95);
@@ -142,7 +272,23 @@ export function PhotographerCameraCapture({
   }
 
   useEffect(() => {
+    loadCameraDevices();
+
+    function handleDeviceChangeEvent() {
+      loadCameraDevices();
+    }
+
+    navigator.mediaDevices?.addEventListener?.(
+      "devicechange",
+      handleDeviceChangeEvent,
+    );
+
     return () => {
+      navigator.mediaDevices?.removeEventListener?.(
+        "devicechange",
+        handleDeviceChangeEvent,
+      );
+
       if (streamRef.current) {
         for (const track of streamRef.current.getTracks()) {
           track.stop();
@@ -160,6 +306,46 @@ export function PhotographerCameraCapture({
         </p>
       </div>
 
+      <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end">
+          <div className="flex-1">
+            <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-400">
+              Camera Device
+            </label>
+            <select
+              value={selectedDeviceId}
+              onChange={handleDeviceChange}
+              disabled={loadingDevices || startingCamera || disabled}
+              className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+            >
+              {devices.length === 0 ? (
+                <option value="">No camera detected</option>
+              ) : (
+                devices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadCameraDevices}
+            disabled={loadingDevices || startingCamera}
+            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
+          >
+            {loadingDevices ? "Refreshing..." : "Refresh Devices"}
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-400">
+          Nama kamera biasanya baru muncul lengkap setelah izin kamera
+          diberikan.
+        </p>
+      </div>
+
       <div className="relative overflow-hidden rounded-2xl border bg-neutral-950">
         <video
           ref={videoRef}
@@ -167,6 +353,9 @@ export function PhotographerCameraCapture({
           playsInline
           muted
           className="aspect-video w-full object-cover"
+          style={{
+            transform: SHOULD_UNMIRROR_CAMERA ? "scaleX(-1)" : "none",
+          }}
         />
 
         {!cameraStarted ? (
@@ -183,7 +372,11 @@ export function PhotographerCameraCapture({
           <button
             type="button"
             onClick={startCamera}
-            disabled={startingCamera || disabled}
+            disabled={
+              startingCamera ||
+              disabled ||
+              (devices.length === 0 && !selectedDeviceId)
+            }
             className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
           >
             {startingCamera ? "Starting Camera..." : "Start Camera"}

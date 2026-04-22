@@ -38,9 +38,34 @@ function StatusBadge({ status }: { status: LiveSession["status"] }) {
           ? "bg-red-100 text-red-700"
           : "bg-gray-100 text-gray-700";
 
+  const label =
+    status === "completed"
+      ? "Completed"
+      : status === "active"
+        ? "Active"
+        : status === "cancelled"
+          ? "Cancelled"
+          : "Pending";
+
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-medium ${className}`}>
-      {status}
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ProgressBadge({
+  currentShotCount,
+  targetShots,
+}: {
+  currentShotCount: number;
+  targetShots: number;
+}) {
+  return (
+    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+      {currentShotCount} / {targetShots} shots
     </span>
   );
 }
@@ -58,12 +83,12 @@ export function PhotographerSessionLivePanel({
   );
   const [isPolling, setIsPolling] = useState(false);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
-  const [cancellingSession, setCancellingSession] = useState(false);
-  const [deletingSession, setDeletingSession] = useState(false);
-  const [reopeningSession, setReopeningSession] = useState(false);
   const [creatingNextTargetShots, setCreatingNextTargetShots] = useState<
     number | null
   >(null);
+  const [cancellingSession, setCancellingSession] = useState(false);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [reopeningSession, setReopeningSession] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
 
   const fetchLatestPanel = useCallback(async () => {
@@ -200,58 +225,6 @@ export function PhotographerSessionLivePanel({
     }
   }
 
-  async function handleReopenSession() {
-    if (!currentSession) {
-      return;
-    }
-
-    try {
-      setReopeningSession(true);
-      setActionMessage("");
-
-      const response = await fetch(
-        `/api/photo-sessions/${currentSession.id}/reopen`,
-        {
-          method: "POST",
-        },
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setActionMessage(result.message || "Gagal reopen session");
-        return;
-      }
-
-      const targetSessionId = result.photoSession?.id;
-
-      if (!targetSessionId) {
-        setActionMessage("Session target tidak ditemukan.");
-        return;
-      }
-
-      if (result.mode === "existing") {
-        setActionMessage(
-          "Masih ada session yang terbuka. Dialihkan ke session tersebut.",
-        );
-      }
-
-      if (result.mode === "reopened") {
-        setActionMessage("Session berhasil di-reopen.");
-      }
-
-      router.push(
-        `/dashboard/events/${eventId}/photobooth?sessionId=${targetSessionId}`,
-      );
-      router.refresh();
-    } catch (error) {
-      console.error("REOPEN_SESSION_CLIENT_ERROR", error);
-      setActionMessage("Terjadi kesalahan saat reopen session");
-    } finally {
-      setReopeningSession(false);
-    }
-  }
-
   async function handleCancelSession() {
     if (!currentSession) {
       return;
@@ -351,6 +324,58 @@ export function PhotographerSessionLivePanel({
     }
   }
 
+  async function handleReopenSession() {
+    if (!currentSession) {
+      return;
+    }
+
+    try {
+      setReopeningSession(true);
+      setActionMessage("");
+
+      const response = await fetch(
+        `/api/photo-sessions/${currentSession.id}/reopen`,
+        {
+          method: "POST",
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setActionMessage(result.message || "Gagal reopen session");
+        return;
+      }
+
+      const targetSessionId = result.photoSession?.id;
+
+      if (!targetSessionId) {
+        setActionMessage("Session target tidak ditemukan.");
+        return;
+      }
+
+      if (result.mode === "existing") {
+        setActionMessage(
+          "Masih ada session yang terbuka. Dialihkan ke session tersebut.",
+        );
+      }
+
+      if (result.mode === "reopened") {
+        setActionMessage("Session berhasil di-reopen.");
+      }
+
+      router.push(
+        `/dashboard/events/${eventId}/photobooth?sessionId=${targetSessionId}`,
+      );
+      router.refresh();
+    } catch (error) {
+      console.error("REOPEN_SESSION_CLIENT_ERROR", error);
+      setActionMessage("Terjadi kesalahan saat reopen session");
+    } finally {
+      setReopeningSession(false);
+    }
+  }
+
   if (!currentSession) {
     return (
       <div className="rounded-3xl border p-6">
@@ -369,6 +394,7 @@ export function PhotographerSessionLivePanel({
   const guestUrl = `${appUrl}/guest/session/${currentSession.qrToken}`;
   const canCapture =
     currentSession.status === "pending" || currentSession.status === "active";
+
   const canDeleteEmptySession =
     currentSession.status === "pending" &&
     currentSession.currentShotCount === 0 &&
@@ -384,53 +410,85 @@ export function PhotographerSessionLivePanel({
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
       <div className="space-y-6 rounded-3xl border p-6">
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-bold">Current Session</h2>
-            <span className="text-xs text-gray-400">
-              {isPolling ? "Updating..." : "Live"}
-            </span>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold">Current Session</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                Monitor QR, progress, dan status sesi aktif.
+              </p>
+            </div>
+
+            <span className="text-xs text-green-400">Live</span>
           </div>
 
-          <p className="mt-1 text-sm text-gray-400">
-            Monitor QR, progress, dan status sesi aktif.
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge status={currentSession.status} />
+            <ProgressBadge
+              currentShotCount={currentSession.currentShotCount}
+              targetShots={currentSession.targetShots}
+            />
+          </div>
         </div>
 
         <div className="rounded-2xl bg-white p-4">
           <PhotoSessionQr value={guestUrl} />
         </div>
 
-        <div className="space-y-3 text-sm">
-          <p>
-            <span className="font-medium">Session ID:</span> {currentSession.id}
-          </p>
-          <p>
-            <span className="font-medium">QR Token:</span>{" "}
-            {currentSession.qrToken}
-          </p>
-          <p>
-            <span className="font-medium">Progress:</span>{" "}
-            {currentSession.currentShotCount} / {currentSession.targetShots}
-          </p>
-          <p>
-            <span className="font-medium">Target Shots:</span>{" "}
-            {currentSession.targetShots}
-          </p>
-          <p>
-            <span className="font-medium">Current Shot Count:</span>{" "}
-            {currentSession.currentShotCount}
-          </p>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="grid gap-3 text-sm">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-400">
+                Session ID
+              </p>
+              <p className="break-all font-medium">{currentSession.id}</p>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Status:</span>
-            <StatusBadge status={currentSession.status} />
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-400">
+                QR Token
+              </p>
+              <p className="break-all font-medium">{currentSession.qrToken}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-white/10 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">
+                  Target
+                </p>
+                <p className="mt-1 text-lg font-bold">
+                  {currentSession.targetShots}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/10 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400">
+                  Current
+                </p>
+                <p className="mt-1 text-lg font-bold">
+                  {currentSession.currentShotCount}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-400">
+                Guest URL
+              </p>
+              <p className="break-all text-xs text-gray-300">{guestUrl}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div>
+            <h3 className="text-sm font-semibold">Session Actions</h3>
+            <p className="mt-1 text-xs text-gray-400">
+              Kelola session yang sedang dibuka.
+            </p>
           </div>
 
-          <p className="break-all text-xs text-gray-400">
-            <span className="font-medium">Guest URL:</span> {guestUrl}
-          </p>
-          <div className="flex flex-col gap-2 pt-2">
+          <div className="flex flex-col gap-2">
             {canDeleteEmptySession ? (
               <button
                 type="button"
@@ -465,14 +523,28 @@ export function PhotographerSessionLivePanel({
                 {reopeningSession ? "Reopening Session..." : "Reopen Session"}
               </button>
             ) : null}
+
+            {!canDeleteEmptySession &&
+            !canCancelSession &&
+            !canReopenSession ? (
+              <div className="rounded-lg border border-white/10 px-4 py-3 text-sm text-gray-400">
+                Tidak ada action khusus untuk session ini.
+              </div>
+            ) : null}
           </div>
         </div>
 
         {currentSession.status === "completed" ? (
           <div className="space-y-3 rounded-2xl border border-green-700/40 bg-green-900/20 p-4">
-            <p className="text-sm text-green-200">
-              Sesi ini sudah penuh. Buat sesi baru untuk tamu berikutnya.
-            </p>
+            <div>
+              <h3 className="text-sm font-semibold text-green-200">
+                Next Session
+              </h3>
+              <p className="mt-1 text-xs text-green-300/80">
+                Session ini sudah penuh. Buat session baru untuk tamu
+                berikutnya.
+              </p>
+            </div>
 
             <div className="flex flex-col gap-2">
               <button
