@@ -9,7 +9,7 @@ import { PhotographerCameraCapture } from "@/components/photographer-camera-capt
 type LivePhoto = {
   id: string;
   fileName: string;
-  fileUrl: string;
+  previewUrl: string | null;
 };
 
 type LiveSession = {
@@ -38,10 +38,57 @@ function StatusBadge({ status }: { status: LiveSession["status"] }) {
           ? "bg-red-100 text-red-700"
           : "bg-gray-100 text-gray-700";
 
+  const label =
+    status === "completed"
+      ? "Completed"
+      : status === "active"
+        ? "Active"
+        : status === "cancelled"
+          ? "Cancelled"
+          : "Pending";
+
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-medium ${className}`}>
-      {status}
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
+    >
+      {label}
     </span>
+  );
+}
+
+function ProgressBadge({
+  currentShotCount,
+  targetShots,
+}: {
+  currentShotCount: number;
+  targetShots: number;
+}) {
+  return (
+    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+      {currentShotCount} / {targetShots} shots
+    </span>
+  );
+}
+
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-sm sm:p-6">
+      <div className="mb-4 sm:mb-5">
+        <h2 className="text-lg font-bold sm:text-xl">{title}</h2>
+        {description ? (
+          <p className="mt-1 text-sm text-gray-400">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -56,20 +103,18 @@ export function PhotographerSessionLivePanel({
   const [currentSession, setCurrentSession] = useState<LiveSession | null>(
     initialSession,
   );
-  const [isPolling, setIsPolling] = useState(false);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
-  const [cancellingSession, setCancellingSession] = useState(false);
-  const [deletingSession, setDeletingSession] = useState(false);
-  const [reopeningSession, setReopeningSession] = useState(false);
   const [creatingNextTargetShots, setCreatingNextTargetShots] = useState<
     number | null
   >(null);
+  const [cancellingSession, setCancellingSession] = useState(false);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [reopeningSession, setReopeningSession] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState<number>(Date.now());
 
   const fetchLatestPanel = useCallback(async () => {
     try {
-      setIsPolling(true);
-
       const url = selectedSessionId
         ? `/api/events/${eventId}/photographer-panel?sessionId=${selectedSessionId}`
         : `/api/events/${eventId}/photographer-panel`;
@@ -85,34 +130,23 @@ export function PhotographerSessionLivePanel({
 
       const result = await response.json();
       setCurrentSession(result.currentSession ?? null);
+      setLastSyncedAt(Date.now());
     } catch (error) {
       console.error("PHOTOGRAPHER_PANEL_POLLING_ERROR", error);
-    } finally {
-      setIsPolling(false);
     }
   }, [eventId, selectedSessionId]);
 
   useEffect(() => {
     setCurrentSession(initialSession);
+    setLastSyncedAt(Date.now());
   }, [initialSession]);
 
   useEffect(() => {
-    let isMounted = true;
+    const interval = setInterval(() => {
+      void fetchLatestPanel();
+    }, 2500);
 
-    async function poll() {
-      if (!isMounted) {
-        return;
-      }
-
-      await fetchLatestPanel();
-    }
-
-    const interval = setInterval(poll, 2500);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [fetchLatestPanel]);
 
   async function handleDeletePhoto(photoId: string) {
@@ -182,9 +216,7 @@ export function PhotographerSessionLivePanel({
         setActionMessage(
           "Masih ada session yang terbuka. Dialihkan ke session tersebut.",
         );
-      }
-
-      if (result.mode === "created") {
+      } else {
         setActionMessage("Session baru berhasil dibuat.");
       }
 
@@ -197,58 +229,6 @@ export function PhotographerSessionLivePanel({
       setActionMessage("Terjadi kesalahan saat membuat photo session baru");
     } finally {
       setCreatingNextTargetShots(null);
-    }
-  }
-
-  async function handleReopenSession() {
-    if (!currentSession) {
-      return;
-    }
-
-    try {
-      setReopeningSession(true);
-      setActionMessage("");
-
-      const response = await fetch(
-        `/api/photo-sessions/${currentSession.id}/reopen`,
-        {
-          method: "POST",
-        },
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setActionMessage(result.message || "Gagal reopen session");
-        return;
-      }
-
-      const targetSessionId = result.photoSession?.id;
-
-      if (!targetSessionId) {
-        setActionMessage("Session target tidak ditemukan.");
-        return;
-      }
-
-      if (result.mode === "existing") {
-        setActionMessage(
-          "Masih ada session yang terbuka. Dialihkan ke session tersebut.",
-        );
-      }
-
-      if (result.mode === "reopened") {
-        setActionMessage("Session berhasil di-reopen.");
-      }
-
-      router.push(
-        `/dashboard/events/${eventId}/photobooth?sessionId=${targetSessionId}`,
-      );
-      router.refresh();
-    } catch (error) {
-      console.error("REOPEN_SESSION_CLIENT_ERROR", error);
-      setActionMessage("Terjadi kesalahan saat reopen session");
-    } finally {
-      setReopeningSession(false);
     }
   }
 
@@ -351,24 +331,78 @@ export function PhotographerSessionLivePanel({
     }
   }
 
+  async function handleReopenSession() {
+    if (!currentSession) {
+      return;
+    }
+
+    try {
+      setReopeningSession(true);
+      setActionMessage("");
+
+      const response = await fetch(
+        `/api/photo-sessions/${currentSession.id}/reopen`,
+        {
+          method: "POST",
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setActionMessage(result.message || "Gagal reopen session");
+        return;
+      }
+
+      const targetSessionId = result.photoSession?.id;
+
+      if (!targetSessionId) {
+        setActionMessage("Session target tidak ditemukan.");
+        return;
+      }
+
+      if (result.mode === "existing") {
+        setActionMessage(
+          "Masih ada session yang terbuka. Dialihkan ke session tersebut.",
+        );
+      } else {
+        setActionMessage("Session berhasil di-reopen.");
+      }
+
+      router.push(
+        `/dashboard/events/${eventId}/photobooth?sessionId=${targetSessionId}`,
+      );
+      router.refresh();
+    } catch (error) {
+      console.error("REOPEN_SESSION_CLIENT_ERROR", error);
+      setActionMessage("Terjadi kesalahan saat reopen session");
+    } finally {
+      setReopeningSession(false);
+    }
+  }
+
   if (!currentSession) {
     return (
-      <div className="rounded-3xl border p-6">
-        <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed">
-          <div className="text-center">
+      <SectionCard
+        title="No Active Session"
+        description="Belum ada session aktif untuk event ini."
+      >
+        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-white/10 px-6 text-center">
+          <div>
             <p className="text-base font-medium">Belum ada session aktif</p>
             <p className="mt-2 text-sm text-gray-400">
-              Refresh halaman atau buat session baru dari panel utama.
+              Buat session baru dari panel utama untuk mulai mengambil foto.
             </p>
           </div>
         </div>
-      </div>
+      </SectionCard>
     );
   }
 
   const guestUrl = `${appUrl}/guest/session/${currentSession.qrToken}`;
   const canCapture =
     currentSession.status === "pending" || currentSession.status === "active";
+
   const canDeleteEmptySession =
     currentSession.status === "pending" &&
     currentSession.currentShotCount === 0 &&
@@ -382,61 +416,90 @@ export function PhotographerSessionLivePanel({
   const canReopenSession = currentSession.status === "cancelled";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <div className="space-y-6 rounded-3xl border p-6">
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-bold">Current Session</h2>
-            <span className="text-xs text-gray-400">
-              {isPolling ? "Updating..." : "Live"}
-            </span>
+    <div className="grid gap-5 md:grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr]">
+      <div className="space-y-5">
+        <SectionCard
+          title="Current Session"
+          description="Monitor QR, progress, dan status sesi aktif."
+        >
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={currentSession.status} />
+              <ProgressBadge
+                currentShotCount={currentSession.currentShotCount}
+                targetShots={currentSession.targetShots}
+              />
+              <span className="text-[11px] text-gray-500">
+                last sync {new Date(lastSyncedAt).toLocaleTimeString()}
+              </span>
+            </div>
+
+            <div className="mx-auto max-w-[220px] rounded-2xl bg-white p-3">
+              <PhotoSessionQr value={guestUrl} />
+            </div>
+
+            <div className="grid gap-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                  Session ID
+                </p>
+                <p className="mt-1 break-all text-sm font-medium">
+                  {currentSession.id}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                  QR Token
+                </p>
+                <p className="mt-1 break-all text-sm font-medium">
+                  {currentSession.qrToken}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                  Guest URL
+                </p>
+                <p className="mt-1 break-all text-xs text-gray-300">
+                  {guestUrl}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                    Target
+                  </p>
+                  <p className="mt-1 text-xl font-bold">
+                    {currentSession.targetShots}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                    Current
+                  </p>
+                  <p className="mt-1 text-xl font-bold">
+                    {currentSession.currentShotCount}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
+        </SectionCard>
 
-          <p className="mt-1 text-sm text-gray-400">
-            Monitor QR, progress, dan status sesi aktif.
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-white p-4">
-          <PhotoSessionQr value={guestUrl} />
-        </div>
-
-        <div className="space-y-3 text-sm">
-          <p>
-            <span className="font-medium">Session ID:</span> {currentSession.id}
-          </p>
-          <p>
-            <span className="font-medium">QR Token:</span>{" "}
-            {currentSession.qrToken}
-          </p>
-          <p>
-            <span className="font-medium">Progress:</span>{" "}
-            {currentSession.currentShotCount} / {currentSession.targetShots}
-          </p>
-          <p>
-            <span className="font-medium">Target Shots:</span>{" "}
-            {currentSession.targetShots}
-          </p>
-          <p>
-            <span className="font-medium">Current Shot Count:</span>{" "}
-            {currentSession.currentShotCount}
-          </p>
-
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Status:</span>
-            <StatusBadge status={currentSession.status} />
-          </div>
-
-          <p className="break-all text-xs text-gray-400">
-            <span className="font-medium">Guest URL:</span> {guestUrl}
-          </p>
-          <div className="flex flex-col gap-2 pt-2">
+        <SectionCard
+          title="Session Actions"
+          description="Kelola session yang sedang dibuka."
+        >
+          <div className="space-y-2">
             {canDeleteEmptySession ? (
               <button
                 type="button"
                 onClick={handleDeleteEmptySession}
                 disabled={deletingSession}
-                className="w-full rounded-lg border border-red-500 px-4 py-2 text-sm font-medium text-red-300 disabled:opacity-50"
+                className="w-full rounded-xl border border-red-500 px-4 py-3 text-sm font-medium text-red-300 disabled:opacity-50"
               >
                 {deletingSession
                   ? "Deleting Session..."
@@ -449,7 +512,7 @@ export function PhotographerSessionLivePanel({
                 type="button"
                 onClick={handleCancelSession}
                 disabled={cancellingSession}
-                className="w-full rounded-lg border border-yellow-500 px-4 py-2 text-sm font-medium text-yellow-300 disabled:opacity-50"
+                className="w-full rounded-xl border border-yellow-500 px-4 py-3 text-sm font-medium text-yellow-300 disabled:opacity-50"
               >
                 {cancellingSession ? "Cancelling Session..." : "Cancel Session"}
               </button>
@@ -460,26 +523,33 @@ export function PhotographerSessionLivePanel({
                 type="button"
                 onClick={handleReopenSession}
                 disabled={reopeningSession}
-                className="w-full rounded-lg border border-blue-500 px-4 py-2 text-sm font-medium text-blue-300 disabled:opacity-50"
+                className="w-full rounded-xl border border-blue-500 px-4 py-3 text-sm font-medium text-blue-300 disabled:opacity-50"
               >
                 {reopeningSession ? "Reopening Session..." : "Reopen Session"}
               </button>
             ) : null}
+
+            {!canDeleteEmptySession &&
+            !canCancelSession &&
+            !canReopenSession ? (
+              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-400">
+                Tidak ada action khusus untuk session ini.
+              </div>
+            ) : null}
           </div>
-        </div>
+        </SectionCard>
 
         {currentSession.status === "completed" ? (
-          <div className="space-y-3 rounded-2xl border border-green-700/40 bg-green-900/20 p-4">
-            <p className="text-sm text-green-200">
-              Sesi ini sudah penuh. Buat sesi baru untuk tamu berikutnya.
-            </p>
-
-            <div className="flex flex-col gap-2">
+          <SectionCard
+            title="Next Session"
+            description="Session ini sudah penuh. Buat session baru untuk tamu berikutnya."
+          >
+            <div className="space-y-2">
               <button
                 type="button"
                 onClick={() => handleCreateNextSession(3)}
                 disabled={creatingNextTargetShots !== null}
-                className="w-full rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+                className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-50"
               >
                 {creatingNextTargetShots === 3
                   ? "Creating 3 Shots..."
@@ -490,18 +560,18 @@ export function PhotographerSessionLivePanel({
                 type="button"
                 onClick={() => handleCreateNextSession(5)}
                 disabled={creatingNextTargetShots !== null}
-                className="w-full rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+                className="w-full rounded-xl border px-4 py-3 text-sm font-semibold disabled:opacity-50"
               >
                 {creatingNextTargetShots === 5
                   ? "Creating 5 Shots..."
                   : "Create Next Session 5 Shots"}
               </button>
             </div>
-          </div>
+          </SectionCard>
         ) : null}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PhotographerCameraCapture
           eventId={eventId}
           photoSessionId={currentSession.id}
@@ -509,25 +579,19 @@ export function PhotographerSessionLivePanel({
           onUploadSuccess={fetchLatestPanel}
         />
 
-        <div className="rounded-3xl border p-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold">Live Preview</h2>
-              <p className="mt-1 text-sm text-gray-400">
-                Preview hasil foto untuk session yang sedang dipakai.
-              </p>
-            </div>
-          </div>
-
+        <SectionCard
+          title="Live Preview"
+          description="Preview hasil foto untuk session yang sedang dipakai."
+        >
           {actionMessage ? (
-            <div className="mb-4 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm">
+            <div className="mb-4 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm">
               {actionMessage}
             </div>
           ) : null}
 
           {currentSession.photos.length === 0 ? (
-            <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed">
-              <div className="text-center">
+            <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-white/10 px-6 text-center">
+              <div>
                 <p className="text-base font-medium">
                   Belum ada foto dalam sesi ini
                 </p>
@@ -537,40 +601,54 @@ export function PhotographerSessionLivePanel({
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               {currentSession.photos.map((photo) => (
                 <div
                   key={photo.id}
-                  className="overflow-hidden rounded-2xl border"
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-black/40"
                 >
-                  <div className="relative aspect-square bg-neutral-900">
-                    <Image
-                      src={photo.fileUrl}
-                      alt={photo.fileName}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
+                  <div className="relative aspect-[4/5] bg-neutral-900">
+                    {photo.previewUrl ? (
+                      <Image
+                        src={photo.previewUrl}
+                        alt={photo.fileName}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-400">
+                        Preview sementara tidak tersedia
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-2 p-4">
-                    <p className="truncate text-sm">{photo.fileName}</p>
+                  <div className="space-y-3 p-4">
+                    <p className="truncate text-sm font-medium">
+                      {photo.fileName}
+                    </p>
 
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href={photo.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-lg border px-3 py-2 text-sm"
-                      >
-                        Preview
-                      </a>
+                    <div className="grid grid-cols-2 gap-2">
+                      {photo.previewUrl ? (
+                        <a
+                          href={photo.previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-3 text-sm font-medium"
+                        >
+                          Preview
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-gray-500">
+                          Preview N/A
+                        </span>
+                      )}
 
                       <button
                         type="button"
                         onClick={() => handleDeletePhoto(photo.id)}
                         disabled={deletingPhotoId === photo.id}
-                        className="rounded-lg border border-red-500 px-3 py-2 text-sm text-red-300 disabled:opacity-50"
+                        className="rounded-xl border border-red-500 px-4 py-3 text-sm font-medium text-red-300 disabled:opacity-50"
                       >
                         {deletingPhotoId === photo.id
                           ? "Deleting..."
@@ -582,7 +660,7 @@ export function PhotographerSessionLivePanel({
               ))}
             </div>
           )}
-        </div>
+        </SectionCard>
       </div>
     </div>
   );
