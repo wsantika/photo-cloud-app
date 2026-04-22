@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,15 @@ export async function GET(
 ) {
   try {
     const { qrToken } = await params;
+
+    const bucketName = process.env.SUPABASE_STORAGE_BUCKET;
+
+    if (!bucketName) {
+      return NextResponse.json(
+        { message: "SUPABASE_STORAGE_BUCKET belum dikonfigurasi" },
+        { status: 500 },
+      );
+    }
 
     const photoSession = await prisma.photoSession.findUnique({
       where: {
@@ -50,23 +60,39 @@ export async function GET(
     }
 
     const zip = new JSZip();
+    let addedFilesCount = 0;
 
     for (let index = 0; index < photoSession.photos.length; index++) {
       const photo = photoSession.photos[index];
 
-      const response = await fetch(photo.fileUrl);
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .download(photo.filePath);
 
-      if (!response.ok) {
+      if (error || !data) {
+        console.error("SUPABASE_DOWNLOAD_ZIP_ITEM_ERROR", {
+          photoId: photo.id,
+          filePath: photo.filePath,
+          error,
+        });
         continue;
       }
 
-      const arrayBuffer = await response.arrayBuffer();
+      const arrayBuffer = await data.arrayBuffer();
 
       const originalFileName = photo.fileName || `photo-${index + 1}.jpg`;
       const safeFileName = sanitizeFileName(originalFileName);
       const numberedFileName = `${String(index + 1).padStart(2, "0")}-${safeFileName}`;
 
       zip.file(numberedFileName, arrayBuffer);
+      addedFilesCount += 1;
+    }
+
+    if (addedFilesCount === 0) {
+      return NextResponse.json(
+        { message: "Gagal menyiapkan file ZIP untuk session ini" },
+        { status: 500 },
+      );
     }
 
     const zipBuffer = await zip.generateAsync({

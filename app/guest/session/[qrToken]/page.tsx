@@ -1,6 +1,9 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getSignedPreviewUrl } from "@/lib/supabase-signed-preview";
+
+export const dynamic = "force-dynamic";
 
 type GuestPhotoSessionPageProps = {
   params: Promise<{
@@ -73,6 +76,17 @@ export default async function GuestPhotoSessionPage({
   if (!photoSession) {
     notFound();
   }
+
+  const photosWithPreviewUrl = await Promise.all(
+    photoSession.photos.map(async (photo) => {
+      const previewUrl = await getSignedPreviewUrl(photo.filePath);
+
+      return {
+        ...photo,
+        previewUrl,
+      };
+    }),
+  );
 
   return (
     <main className="min-h-screen bg-black px-4 py-5 text-white sm:px-6 sm:py-8">
@@ -148,7 +162,7 @@ export default async function GuestPhotoSessionPage({
             </div>
           </div>
 
-          {photoSession.photos.length === 0 ? (
+          {photosWithPreviewUrl.length === 0 ? (
             <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-white/15 px-6 text-center">
               <div>
                 <p className="text-base font-medium text-white">
@@ -162,19 +176,25 @@ export default async function GuestPhotoSessionPage({
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {photoSession.photos.map((photo, index) => (
+              {photosWithPreviewUrl.map((photo, index) => (
                 <div
                   key={photo.id}
                   className="overflow-hidden rounded-3xl border border-white/10 bg-black/40"
                 >
                   <div className="relative aspect-[4/5] bg-neutral-900">
-                    <Image
-                      src={photo.fileUrl}
-                      alt={photo.fileName}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
+                    {photo.previewUrl ? (
+                      <Image
+                        src={photo.previewUrl}
+                        alt={photo.fileName}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-400">
+                        Preview sementara tidak tersedia
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3 p-4">
@@ -188,17 +208,23 @@ export default async function GuestPhotoSessionPage({
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <a
-                        href={photo.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-3 text-sm font-medium text-white"
-                      >
-                        Preview
-                      </a>
+                      {photo.previewUrl ? (
+                        <a
+                          href={photo.previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-3 text-sm font-medium text-white"
+                        >
+                          Preview
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-gray-500">
+                          Preview N/A
+                        </span>
+                      )}
 
                       <a
-                        href={`/api/guest/photo/${photo.id}/download`}
+                        href={`/api/guest/photo/${photo.id}/download?qrToken=${qrToken}`}
                         className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black"
                       >
                         Download
@@ -209,6 +235,13 @@ export default async function GuestPhotoSessionPage({
               ))}
             </div>
           )}
+
+          {photosWithPreviewUrl.length > 0 ? (
+            <p className="mt-4 text-xs text-gray-500">
+              Preview link bersifat sementara. Kalau preview gagal dibuka
+              setelah beberapa waktu, refresh halaman ini.
+            </p>
+          ) : null}
         </div>
       </div>
     </main>

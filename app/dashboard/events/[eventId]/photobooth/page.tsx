@@ -79,7 +79,7 @@ export default async function PhotographerPanelPage({
         photos: currentSession.photos.map((photo) => ({
           id: photo.id,
           fileName: photo.fileName,
-          fileUrl: photo.fileUrl,
+          previewUrl: photo.fileUrl ?? null,
         })),
       }
     : null;

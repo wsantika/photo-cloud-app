@@ -9,7 +9,7 @@ import { PhotographerCameraCapture } from "@/components/photographer-camera-capt
 type LivePhoto = {
   id: string;
   fileName: string;
-  fileUrl: string;
+  previewUrl: string | null;
 };
 
 type LiveSession = {
@@ -608,13 +608,19 @@ export function PhotographerSessionLivePanel({
                   className="overflow-hidden rounded-3xl border border-white/10 bg-black/40"
                 >
                   <div className="relative aspect-[4/5] bg-neutral-900">
-                    <Image
-                      src={photo.fileUrl}
-                      alt={photo.fileName}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
+                    {photo.previewUrl ? (
+                      <Image
+                        src={photo.previewUrl}
+                        alt={photo.fileName}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-400">
+                        Preview sementara tidak tersedia
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3 p-4">
@@ -623,14 +629,20 @@ export function PhotographerSessionLivePanel({
                     </p>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <a
-                        href={photo.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-3 text-sm font-medium"
-                      >
-                        Preview
-                      </a>
+                      {photo.previewUrl ? (
+                        <a
+                          href={photo.previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-3 text-sm font-medium"
+                        >
+                          Preview
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-gray-500">
+                          Preview N/A
+                        </span>
+                      )}
 
                       <button
                         type="button"

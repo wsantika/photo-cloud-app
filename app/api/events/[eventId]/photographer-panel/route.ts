@@ -2,12 +2,53 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getSignedPreviewUrl } from "@/lib/supabase-signed-preview";
 
 type RouteProps = {
   params: Promise<{
     eventId: string;
   }>;
 };
+
+async function attachPreviewUrlsToSession<
+  T extends {
+    id: string;
+    qrToken: string;
+    targetShots: number;
+    currentShotCount: number;
+    status: "pending" | "active" | "completed" | "cancelled";
+    photos: Array<{
+      id: string;
+      fileName: string;
+      filePath: string;
+    }>;
+  } | null,
+>(photoSession: T) {
+  if (!photoSession) {
+    return null;
+  }
+
+  const photosWithPreviewUrl = await Promise.all(
+    photoSession.photos.map(async (photo) => {
+      const previewUrl = await getSignedPreviewUrl(photo.filePath);
+
+      return {
+        id: photo.id,
+        fileName: photo.fileName,
+        previewUrl,
+      };
+    }),
+  );
+
+  return {
+    id: photoSession.id,
+    qrToken: photoSession.qrToken,
+    targetShots: photoSession.targetShots,
+    currentShotCount: photoSession.currentShotCount,
+    status: photoSession.status,
+    photos: photosWithPreviewUrl,
+  };
+}
 
 export async function GET(req: Request, { params }: RouteProps) {
   try {
@@ -52,6 +93,11 @@ export async function GET(req: Request, { params }: RouteProps) {
             orderBy: {
               uploadedAt: "asc",
             },
+            select: {
+              id: true,
+              fileName: true,
+              filePath: true,
+            },
           },
         },
       });
@@ -73,15 +119,23 @@ export async function GET(req: Request, { params }: RouteProps) {
             orderBy: {
               uploadedAt: "asc",
             },
+            select: {
+              id: true,
+              fileName: true,
+              filePath: true,
+            },
           },
         },
       });
     }
 
+    const currentSessionWithPreview =
+      await attachPreviewUrlsToSession(currentSession);
+
     return NextResponse.json({
       eventId: event.id,
       eventTitle: event.title,
-      currentSession,
+      currentSession: currentSessionWithPreview,
     });
   } catch (error) {
     console.error("PHOTOGRAPHER_PANEL_ROUTE_ERROR", error);
