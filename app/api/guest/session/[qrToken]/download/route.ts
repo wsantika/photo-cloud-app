@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { sanitizeFileName } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
@@ -11,9 +12,7 @@ type DownloadSessionRouteProps = {
   }>;
 };
 
-function sanitizeFileName(value: string) {
-  return value.replace(/[^a-zA-Z0-9.-]/g, "-");
-}
+
 
 export async function GET(
   _req: Request,

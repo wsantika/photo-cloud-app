@@ -21,10 +21,7 @@ export const authOptions: NextAuthOptions = {
         },
       },
       async authorize(credentials) {
-        console.log("credentials masuk:", credentials);
-
         if (!credentials?.email || !credentials?.password) {
-          console.log("email/password kosong");
           return null;
         }
 
@@ -34,10 +31,7 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        console.log("user ketemu:", user);
-
         if (!user) {
-          console.log("user tidak ditemukan");
           return null;
         }
 
@@ -46,10 +40,7 @@ export const authOptions: NextAuthOptions = {
           user.password,
         );
 
-        console.log("password valid?", isPasswordValid);
-
         if (!isPasswordValid) {
-          console.log("password tidak cocok");
           return null;
         }
 

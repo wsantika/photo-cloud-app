@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createPhotoSession } from "../actions";
 import { PhotographerSessionLivePanel } from "@/components/photographer-session-live-panel";
+import { getSignedPreviewUrl } from "@/lib/supabase-signed-preview";
 
 type PhotographerPanelPageProps = {
   params: Promise<{
@@ -76,11 +77,15 @@ export default async function PhotographerPanelPage({
         targetShots: currentSession.targetShots,
         currentShotCount: currentSession.currentShotCount,
         status: currentSession.status,
-        photos: currentSession.photos.map((photo) => ({
-          id: photo.id,
-          fileName: photo.fileName,
-          previewUrl: photo.fileUrl ?? null,
-        })),
+        photos: await Promise.all(
+          currentSession.photos.map(async (photo) => ({
+            id: photo.id,
+            fileName: photo.fileName,
+            previewUrl: photo.filePath
+              ? await getSignedPreviewUrl(photo.filePath)
+              : null,
+          }))
+        ),
       }
     : null;
 

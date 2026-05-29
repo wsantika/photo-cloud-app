@@ -46,7 +46,8 @@ export async function POST(_: Request, { params }: Params) {
       },
     });
 
-    const guestUrl = `${process.env.NEXTAUTH_URL}/guest/${token}`;
+    const baseUrl = process.env.APP_URL || process.env.NEXTAUTH_URL;
+    const guestUrl = `${baseUrl}/guest/${token}`;
     const qrCodeDataUrl = await QRCode.toDataURL(guestUrl);
 
     return NextResponse.json({

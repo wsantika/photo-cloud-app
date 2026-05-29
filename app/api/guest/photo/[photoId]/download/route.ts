@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { sanitizeFileName } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
@@ -10,9 +11,7 @@ type DownloadPhotoRouteProps = {
   }>;
 };
 
-function sanitizeFileName(value: string) {
-  return value.replace(/[^a-zA-Z0-9.-]/g, "-");
-}
+
 
 export async function GET(req: Request, { params }: DownloadPhotoRouteProps) {
   try {
