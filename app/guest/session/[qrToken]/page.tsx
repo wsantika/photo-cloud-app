@@ -50,7 +50,9 @@ export default async function GuestPhotoSessionPage({
 
   const photosWithPreviewUrl = await Promise.all(
     photoSession.photos.map(async (photo) => {
-      const previewUrl = await getSignedPreviewUrl(photo.filePath);
+      const previewUrl = await getSignedPreviewUrl(
+        photo.thumbnailPath ?? photo.filePath,
+      );
 
       return {
         ...photo,

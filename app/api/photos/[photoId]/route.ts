@@ -69,9 +69,13 @@ export async function DELETE(_req: Request, { params }: RouteProps) {
       );
     }
 
+    const pathsToRemove = [photo.filePath, photo.thumbnailPath].filter(
+      Boolean,
+    ) as string[];
+
     const { error: removeError } = await supabase.storage
       .from(bucketName)
-      .remove([photo.filePath]);
+      .remove(pathsToRemove);
 
     if (removeError) {
       console.error("SUPABASE_REMOVE_ERROR", removeError);

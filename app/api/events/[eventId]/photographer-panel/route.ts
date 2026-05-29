@@ -21,6 +21,7 @@ async function attachPreviewUrlsToSession<
       id: string;
       fileName: string;
       filePath: string;
+      thumbnailPath: string | null;
     }>;
   } | null,
 >(photoSession: T) {
@@ -30,7 +31,9 @@ async function attachPreviewUrlsToSession<
 
   const photosWithPreviewUrl = await Promise.all(
     photoSession.photos.map(async (photo) => {
-      const previewUrl = await getSignedPreviewUrl(photo.filePath);
+      const previewUrl = await getSignedPreviewUrl(
+        photo.thumbnailPath ?? photo.filePath,
+      );
 
       return {
         id: photo.id,
@@ -97,6 +100,7 @@ export async function GET(req: Request, { params }: RouteProps) {
               id: true,
               fileName: true,
               filePath: true,
+              thumbnailPath: true,
             },
           },
         },
@@ -123,6 +127,7 @@ export async function GET(req: Request, { params }: RouteProps) {
               id: true,
               fileName: true,
               filePath: true,
+              thumbnailPath: true,
             },
           },
         },
