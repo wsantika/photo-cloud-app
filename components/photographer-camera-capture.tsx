@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type PhotographerCameraCaptureProps = {
   eventId: string;
@@ -34,7 +34,7 @@ export function PhotographerCameraCapture({
   const [capturing, setCapturing] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function loadCameraDevices() {
+  const loadCameraDevices = useCallback(async () => {
     try {
       setLoadingDevices(true);
 
@@ -54,24 +54,26 @@ export function PhotographerCameraCapture({
 
       setDevices(videoInputs);
 
-      if (!selectedDeviceId && videoInputs.length > 0) {
-        setSelectedDeviceId(videoInputs[0].deviceId);
-      }
-
-      if (
-        selectedDeviceId &&
-        videoInputs.length > 0 &&
-        !videoInputs.some((device) => device.deviceId === selectedDeviceId)
-      ) {
-        setSelectedDeviceId(videoInputs[0].deviceId);
-      }
+      setSelectedDeviceId((prev) => {
+        if (!prev && videoInputs.length > 0) {
+          return videoInputs[0].deviceId;
+        }
+        if (
+          prev &&
+          videoInputs.length > 0 &&
+          !videoInputs.some((device) => device.deviceId === prev)
+        ) {
+          return videoInputs[0].deviceId;
+        }
+        return prev;
+      });
     } catch (error) {
       console.error("LOAD_CAMERA_DEVICES_ERROR", error);
       setMessage("Gagal mengambil daftar kamera.");
     } finally {
       setLoadingDevices(false);
     }
-  }
+  }, []);
 
   async function attachStreamToVideo(stream: MediaStream) {
     if (!videoRef.current) {
@@ -272,10 +274,14 @@ export function PhotographerCameraCapture({
   }
 
   useEffect(() => {
-    loadCameraDevices();
+    const init = async () => {
+      await loadCameraDevices();
+    };
+    
+    void init();
 
     function handleDeviceChangeEvent() {
-      loadCameraDevices();
+      void init();
     }
 
     navigator.mediaDevices?.addEventListener?.(
@@ -295,7 +301,7 @@ export function PhotographerCameraCapture({
         }
       }
     };
-  }, []);
+  }, [loadCameraDevices]);
 
   return (
     <div className="space-y-4 rounded-3xl border p-6">

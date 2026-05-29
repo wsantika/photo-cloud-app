@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PhotoSessionQr } from "@/components/photo-session-qr";
+import { StatusBadge } from "@/components/status-badge";
 import { PhotographerCameraCapture } from "@/components/photographer-camera-capture";
 
 type LivePhoto = {
@@ -28,33 +29,7 @@ type PhotographerSessionLivePanelProps = {
   selectedSessionId?: string | null;
 };
 
-function StatusBadge({ status }: { status: LiveSession["status"] }) {
-  const className =
-    status === "completed"
-      ? "bg-green-100 text-green-700"
-      : status === "active"
-        ? "bg-blue-100 text-blue-700"
-        : status === "cancelled"
-          ? "bg-red-100 text-red-700"
-          : "bg-gray-100 text-gray-700";
 
-  const label =
-    status === "completed"
-      ? "Completed"
-      : status === "active"
-        ? "Active"
-        : status === "cancelled"
-          ? "Cancelled"
-          : "Pending";
-
-  return (
-    <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
-    >
-      {label}
-    </span>
-  );
-}
 
 function ProgressBadge({
   currentShotCount,
@@ -111,7 +86,7 @@ export function PhotographerSessionLivePanel({
   const [deletingSession, setDeletingSession] = useState(false);
   const [reopeningSession, setReopeningSession] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
-  const [lastSyncedAt, setLastSyncedAt] = useState<number>(Date.now());
+  const [lastSyncedAt, setLastSyncedAt] = useState<number>(() => Date.now());
 
   const fetchLatestPanel = useCallback(async () => {
     try {
@@ -136,10 +111,11 @@ export function PhotographerSessionLivePanel({
     }
   }, [eventId, selectedSessionId]);
 
-  useEffect(() => {
+  const [prevInitialSession, setPrevInitialSession] = useState(initialSession);
+  if (prevInitialSession !== initialSession) {
+    setPrevInitialSession(initialSession);
     setCurrentSession(initialSession);
-    setLastSyncedAt(Date.now());
-  }, [initialSession]);
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -429,7 +405,10 @@ export function PhotographerSessionLivePanel({
                 currentShotCount={currentSession.currentShotCount}
                 targetShots={currentSession.targetShots}
               />
-              <span className="text-[11px] text-gray-500">
+              <span
+                className="text-[11px] text-gray-500"
+                suppressHydrationWarning
+              >
                 last sync {new Date(lastSyncedAt).toLocaleTimeString()}
               </span>
             </div>

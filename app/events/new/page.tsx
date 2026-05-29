@@ -52,7 +52,7 @@ export default function NewEventPage() {
       setTimeout(() => {
         router.push("/dashboard");
       }, 1000);
-    } catch (err) {
+    } catch {
       setError("Terjadi kesalahan saat mengirim data");
       setLoading(false);
       return;
