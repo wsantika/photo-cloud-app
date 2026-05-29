@@ -20,6 +20,13 @@ enum PhotoSessionStatus {
   cancelled
 }
 
+enum ImageProcessingStatus {
+  queued
+  processing
+  completed
+  failed
+}
+
 model User {
   id            String         @id @default(cuid())
   name          String
@@ -59,17 +66,22 @@ model GuestSession {
 }
 
 model Photo {
-  id             String        @id @default(cuid())
-  eventId        String
-  photoSessionId String?
-  event          Event         @relation(fields: [eventId], references: [id])
-  photoSession   PhotoSession? @relation(fields: [photoSessionId], references: [id])
-  fileName       String
-  filePath       String        @unique
-  fileUrl        String
-  mimeType       String
-  size           Int
-  uploadedAt     DateTime      @default(now())
+  id                    String                @id @default(cuid())
+  eventId               String
+  photoSessionId        String?
+  event                 Event                 @relation(fields: [eventId], references: [id])
+  photoSession          PhotoSession?         @relation(fields: [photoSessionId], references: [id])
+  fileName              String
+  filePath              String                @unique
+  fileUrl               String
+  mimeType              String
+  size                  Int
+  thumbnailPath         String?
+  thumbnailUrl          String?
+  imageProcessingStatus ImageProcessingStatus @default(queued)
+  imageProcessingError  String?
+  imageProcessedAt      DateTime?
+  uploadedAt            DateTime              @default(now())
 }
 
 model PhotoSession {
