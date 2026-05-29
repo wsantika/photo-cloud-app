@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { enqueueImageProcessingJob } from "@/lib/image-processing-queue";
+
+export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -171,6 +174,8 @@ export async function POST(req: Request) {
         totalPhotos,
       };
     });
+
+    enqueueImageProcessingJob();
 
     return NextResponse.json(
       {
