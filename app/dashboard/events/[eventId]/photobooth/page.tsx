@@ -78,13 +78,17 @@ export default async function PhotographerPanelPage({
         currentShotCount: currentSession.currentShotCount,
         status: currentSession.status,
         photos: await Promise.all(
-          currentSession.photos.map(async (photo) => ({
-            id: photo.id,
-            fileName: photo.fileName,
-            previewUrl: photo.filePath
-              ? await getSignedPreviewUrl(photo.filePath)
-              : null,
-          }))
+          currentSession.photos.map(async (photo) => {
+            const previewPath = photo.thumbnailPath ?? photo.filePath;
+
+            return {
+              id: photo.id,
+              fileName: photo.fileName,
+              previewUrl: previewPath
+                ? await getSignedPreviewUrl(previewPath)
+                : null,
+            };
+          })
         ),
       }
     : null;
