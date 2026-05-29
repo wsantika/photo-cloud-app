@@ -925,12 +925,24 @@ Potential next work:
 
 ### Background worker / image processing
 
+Status: implemented for MVP / issue #15.
+
 Goal:
 
 - generate thumbnail
 - compress image
 - reduce gallery load
 - keep original file for download
+
+Current implementation:
+
+- upload stores original file in Supabase Storage
+- `Photo.imageProcessingStatus` tracks queued, processing, completed, or failed
+- `enqueueImageProcessingJob()` starts an in-process background worker after upload
+- worker resizes and compresses a JPEG thumbnail via `sharp`
+- thumbnail path is saved to `Photo.thumbnailPath`
+- guest gallery and photographer panel use thumbnail preview when available
+- download endpoints still return the original file
 
 Recommended MVP version:
 
@@ -942,7 +954,9 @@ upload original
 -> download uses original
 ```
 
-Do not start with complex queue unless needed.
+Do not start with a Redis/BullMQ queue unless multiple app instances or durable
+retry requirements become necessary. The current queue is database-status backed
+and triggered by the Next.js Node.js process.
 
 ### Tethered camera upload bridge
 
