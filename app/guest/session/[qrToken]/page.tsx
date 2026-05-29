@@ -2,6 +2,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSignedPreviewUrl } from "@/lib/supabase-signed-preview";
+import { StatusBadge } from "@/components/status-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -11,37 +12,7 @@ type GuestPhotoSessionPageProps = {
   }>;
 };
 
-function StatusBadge({
-  status,
-}: {
-  status: "pending" | "active" | "completed" | "cancelled";
-}) {
-  const className =
-    status === "completed"
-      ? "bg-green-100 text-green-700"
-      : status === "active"
-        ? "bg-blue-100 text-blue-700"
-        : status === "cancelled"
-          ? "bg-red-100 text-red-700"
-          : "bg-gray-100 text-gray-700";
 
-  const label =
-    status === "completed"
-      ? "Completed"
-      : status === "active"
-        ? "Active"
-        : status === "cancelled"
-          ? "Cancelled"
-          : "Pending";
-
-  return (
-    <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
-    >
-      {label}
-    </span>
-  );
-}
 
 function InfoCard({ label, value }: { label: string; value: string | number }) {
   return (
